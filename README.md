@@ -1,4 +1,4 @@
-## Chikn  
+## Chikn
 *A game about chickens fighting on a platform*
 
 ![](http://i.imgur.com/g2oSQ1w.png)
