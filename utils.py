@@ -46,8 +46,8 @@ def getControls(controller, keys): # returns a hash of keys to the appropriate c
 
     if controller.startswith("kb"): # handle input for keyboards
         keyboard = keyboards[int(controller[2:])]
-        for key, val in keyboard.iteritems():
-            arr[key] = keys[val]
+        for key in keyboard:
+            arr[key] = keys[keyboard[key]]
 
     elif controller.startswith("joy"): # handle input for controllers
         joy = pygame.joystick.Joystick(int(controller[3:]))

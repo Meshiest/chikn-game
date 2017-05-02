@@ -14,6 +14,9 @@ maxLives = 3
 
 spawnTimeout = 5
 
+DAMAGE_CONST = 0.1
+SLAM_COOLDOWN = 0.3
+
 BTN_A = 0
 BTN_B = 1
 BTN_X = 2

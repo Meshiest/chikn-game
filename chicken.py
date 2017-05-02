@@ -42,7 +42,7 @@ class Chicken:
 		
 		# facing direction
 		self.lastDir = 1
-		
+
 		# time since the player flapped (at death) and spawn time
 		self.lastFlap = self.spawnTime = time.time()
 		# one tick history of key['up']
@@ -50,6 +50,9 @@ class Chicken:
 
 		# seconds of holding down while on the ground, max at 3 (should make a constant)
 		self.charge = 0
+
+		# Amount of damage done
+		self.damageMod = 1
 
 		# last player to slam/touch this player
 		self.attacker = self
@@ -70,7 +73,7 @@ class Chicken:
 	def canJump(self):
 
 		# player is falling
-		if self.vy > abs(0.3):
+		if self.vy > abs(0.1):
 			return False
 
 		# player is vertically on the platform
@@ -80,6 +83,7 @@ class Chicken:
 		# player is horizontally on the platform
 		return self.x > WIDTH/2-platform_width/2-self.size/2 and self.x < WIDTH/2+platform_width/2+self.size/2
 
+	# Get the nearest chiken
 	def nearest(self):
 		distance = 1000 * self.size
 		near = False
@@ -94,6 +98,7 @@ class Chicken:
 
 		return near
 
+	# all the nearest chickens
 	def nearArr(self, distance):
 		near = []
 		for obj in objects:
@@ -106,18 +111,39 @@ class Chicken:
 
 		return near
 
-	def forceAway(self, obj, maxDist):
+	# Push this chicken away from other chickens
+	def forceAway(self, obj, maxDist, bonus):
 		maxDist += obj.size/2
 		dist = math.hypot(self.x-obj.x, self.y-obj.y-obj.size/4)
 		if dist > maxDist:
 			return
 
+
 		theta = math.atan2(self.y-obj.y-obj.size/4, self.x-obj.x)
 		coeff = 10
+		coeff *= self.damageMod
 		if self.charge > 0:
 			coeff += self.charge
-		self.vx += math.cos(theta)*((maxDist-dist)*coeff)
-		self.vy += math.sin(theta)*((maxDist-dist)*coeff)
+		xVel = math.cos(theta)*((maxDist-dist)*coeff)
+		yVel = math.sin(theta)*((maxDist-dist)*coeff)
+		self.vx += xVel
+		self.vy += yVel
+
+		# spawn some feathers
+		for i in range(5):
+			angle = random.random() * math.pi * 2
+			power = random.random() * 200 + 100
+			effects.append(Feather(
+				self.x,
+				self.y-self.size/2,
+				math.cos(angle)*power - xVel / 3,
+				math.sin(angle)*power - yVel / 3,
+				random.random() < 0.5 and self.color or None)
+			)
+
+		# Update damage mod with new damage
+		damage = 1 - dist / maxDist + bonus
+		self.damageMod += damage * DAMAGE_CONST
 
 	def boost(self):
 		if self.charge > 0.25:
@@ -154,7 +180,6 @@ class Chicken:
 
 		if(keys['up'] and self.canJump() and not self.slam):
 			self.vy = -7.5*self.size
-			self.slamExplode()
 			jumpSound.play()
 			self.lastJump = time.time()
 
@@ -168,7 +193,7 @@ class Chicken:
 			self.flapDown = False
 
 
-		if(keys['down'] and not self.slam and not self.lastSlam):
+		if keys['down'] and not self.slam and not self.lastSlam and time.time() - self.slamEnd > SLAM_COOLDOWN:
 			self.lastSlam = True
 			if not self.canJump(): 
 				self.slam = True
@@ -200,10 +225,10 @@ class Chicken:
 
 			if dist < minDist:
 				# push players if they're inside of eachother
-				self.x += (minDist-dist)*math.cos(theta)
-				self.y += (minDist-dist)*math.sin(theta)
-				obj.x += (minDist-dist)*math.cos(theta+math.pi)
-				obj.y += (minDist-dist)*math.sin(theta+math.pi)
+				self.x += (minDist-dist)*math.cos(theta) * self.damageMod
+				self.y += (minDist-dist)*math.sin(theta) * self.damageMod
+				obj.x += (minDist-dist)*math.cos(theta+math.pi) * obj.damageMod
+				obj.y += (minDist-dist)*math.sin(theta+math.pi) * obj.damageMod
 				# bounce players away on x axis
 				self.vx = netX/2
 				obj.vx = -netX/2
@@ -235,14 +260,13 @@ class Chicken:
 
 				if self.slam: # check if the player is slamming and push away nearby players
 					self.slam = False
-					bonusPower = (self.vy-800)/30
-					#print bonusPower
+					bonusPower = (self.vy-800)/12
 					self.fitness += bonusPower + self.size*2
 					near = self.nearArr(self.size*2)
 					slamSound.play()
 					for obj in near:
 						obj.attacker = self
-						obj.forceAway(self, self.size*2+bonusPower)
+						obj.forceAway(self, self.size*2+bonusPower, bonusPower/15)
 
 					self.slamEnd = time.time()
 
@@ -272,6 +296,9 @@ class Chicken:
 
 		# time since last slam
 		slamDelta = time.time() - self.slamEnd
+
+		# size of waddle
+		waddleScale = min(slamDelta / SLAM_COOLDOWN, 1)
 
 		# player is slamming
 		isSlamming = self.slam and self.vy > 20 * self.size
@@ -312,11 +339,12 @@ class Chicken:
 		)
 
 		# rectangle for the waddle 
+		waddleHeight = body[3]/2.0 * waddleScale
 		waddle = (
 			self.x-self.size/8+self.lastDir*(body[2]/2+self.size/8),
 			body[1]+body[3]/2.0,
 			self.size/4,
-			body[3]/2.0
+			waddleHeight
 		)
 
 		# drawing the rectangles that make up the chicken
@@ -333,12 +361,14 @@ class Chicken:
 			))
 
 		# draw the weird top waddle thing on a chicken
+		headWidth = body[2]/4
 		for i in range(3):
+			headHeight = (self.size/5)*body[3]/self.size*(i+1) * self.damageMod
 			pygame.draw.rect(scr, self.color, (
-				self.x-body[2]/4*((self.lastDir+1)/2)+(body[2]/4*(i))*self.lastDir,
-				body[1]-(self.size/5)*body[3]/self.size*(i+1),
-				body[2]/4,
-				(self.size/5)*body[3]/self.size*(i+1)
+				self.x-headWidth*((self.lastDir+1)/2)+(headWidth*(i))*self.lastDir,
+				body[1]-headHeight,
+				headWidth,
+				headHeight
 			))
 
 		# check if there's a nearby enemy
@@ -350,11 +380,12 @@ class Chicken:
 			nearY = math.sin(theta) / 10.0 * self.size
 
 		# rectangle for eye
+		eyeSize = self.size/6 * self.damageMod
 		eye = (
-			self.x+body[2]/4*self.lastDir-self.size/12+nearX,
-			body[1]+body[3]/4.0-self.size/12+nearY,
-			self.size/6,
-			self.size/6
+			self.x+body[2]/4*self.lastDir-eyeSize/2+nearX,
+			body[1]+body[3]/4.0-eyeSize/2+nearY,
+			eyeSize,
+			eyeSize
 		)
 
 		# draw the eye
