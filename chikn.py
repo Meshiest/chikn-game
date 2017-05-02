@@ -250,7 +250,7 @@ def drawJoinMenu(keys):
         global LEARNING
         
         LEARNING = not LEARNING
-        print "LEARNING is "+str(LEARNING)
+        print("LEARNING is "+str(LEARNING))
 
     tick = time.time()
     centerX = WIDTH/2
@@ -292,7 +292,7 @@ def drawJoinMenu(keys):
  
         remainder = playerCount % 4 
         for i in range(playerCount):
-            print "Adding player %s" % (players[i])
+            print("Adding player %s" % (players[i]))
 
             total = (i < playerCount - remainder and 4 or remainder) # num players on row
             part = platform_width*2/3.0/total # space between players

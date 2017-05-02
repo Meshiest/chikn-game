@@ -31,7 +31,7 @@ def initJoysticks():
 
     pygame.joystick.init()
     for i in range(pygame.joystick.get_count()):
-        print "Initializing joy%i"%(i)
+        print("Initializing joy%i"%(i))
         joy = pygame.joystick.Joystick(i)
         joy.init()
 

@@ -7,7 +7,7 @@ from constants import *
 screen = pygame.display.get_surface()
 
 def saveBrain():
-    print ""
+    print("")
 
 # returns the controls for the bot
 def getBotMovement(controller):
@@ -126,7 +126,7 @@ def learnMovement(controller, keys):
     for b in buttons:
         out.append(keys[b] and 1 or 0)
     ds.addSample(environment, out)
-    print "Training"
+    print("Training")
     trainer.train()
     
 def getEnvironment(bot):
