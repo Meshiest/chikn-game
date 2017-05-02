@@ -36,7 +36,8 @@ class Chicken:
 
 		# slam variables
 		self.slam = False # player is slamming
-		self.slamEnd = 0 # time since player was crouched on the ground (0 the moment of impact)
+		self.crouchEnd = 0 # time since player was crouched on the ground (0 the moment of impact)
+		self.groundTime = 0
 		# one tick history of key['down']
 		self.lastSlam = False
 		
@@ -167,7 +168,7 @@ class Chicken:
 				self.lastDir = 1
 			
 			if keys['down']:
-				self.slamEnd = time.time()
+				self.crouchEnd = time.time()
 			return
 
 		if(keys['left'] and self.vx > -5 * self.size):
@@ -193,7 +194,7 @@ class Chicken:
 			self.flapDown = False
 
 
-		if keys['down'] and not self.slam and not self.lastSlam and time.time() - self.slamEnd > SLAM_COOLDOWN:
+		if keys['down'] and not self.slam and not self.lastSlam and time.time() - self.groundTime > SLAM_COOLDOWN:
 			self.lastSlam = True
 			if not self.canJump(): 
 				self.slam = True
@@ -207,7 +208,7 @@ class Chicken:
 			if self.charge > 0.25:
 				self.boost()
 		elif self.canJump():
-			self.slamEnd = time.time()
+			self.crouchEnd = time.time()
 
 		if not self.canJump() and self.charge > 0:
 			self.boost()
@@ -246,7 +247,7 @@ class Chicken:
 		direction = math.copysign(1,dist)
 
 		# time from last slam land or crouch
-		slamDelta = time.time() - self.slamEnd
+		crouchDelta = time.time() - self.crouchEnd
 		
 		# add gravity
 		self.vy += 400*delta    
@@ -260,7 +261,7 @@ class Chicken:
 
 				if self.slam: # check if the player is slamming and push away nearby players
 					self.slam = False
-					bonusPower = (self.vy-800)/12
+					bonusPower = max((self.vy-800)/12, 0)
 					self.fitness += bonusPower + self.size*2
 					near = self.nearArr(self.size*2)
 					slamSound.play()
@@ -268,7 +269,8 @@ class Chicken:
 						obj.attacker = self
 						obj.forceAway(self, self.size*2+bonusPower, bonusPower/15)
 
-					self.slamEnd = time.time()
+					self.crouchEnd = time.time()
+					self.groundTime = time.time()
 
 				# stop the player to prevent falling through the platform
 				if self.vy > 0:
@@ -278,7 +280,7 @@ class Chicken:
 				self.y = HEIGHT-platform_height
 
 				# if player is no longer crouching
-				if slamDelta > 0.05:
+				if crouchDelta > 0.05:
 					self.charge = 0
 				else:
 					self.charge += delta
@@ -295,10 +297,10 @@ class Chicken:
 	def draw(self, scr):
 
 		# time since last slam
-		slamDelta = time.time() - self.slamEnd
+		crouchDelta = time.time() - self.crouchEnd
 
 		# size of waddle
-		waddleScale = min(slamDelta / SLAM_COOLDOWN, 1)
+		waddleScale = min((time.time() - self.groundTime) / SLAM_COOLDOWN, 1)
 
 		# player is slamming
 		isSlamming = self.slam and self.vy > 20 * self.size
@@ -318,11 +320,11 @@ class Chicken:
 			self.y - self.size,
 			self.size/2.0,
 			self.size
-		) or slamDelta < 0.1 and ( #squashed body
+		) or crouchDelta < 0.1 and ( #squashed body
 			self.x - self.size/2.0,
-			self.y - self.size/4.0 - (self.size/4.0*3)*((slamDelta/0.1)**2),
+			self.y - self.size/4.0 - (self.size/4.0*3)*((crouchDelta/0.1)**2),
 			self.size,
-			self.size/4.0 + (self.size/4.0*3)*((slamDelta/0.1)**2)
+			self.size/4.0 + (self.size/4.0*3)*((crouchDelta/0.1)**2)
 		) or ( # regular square body
 			self.x - self.size/2.0,
 			self.y - self.size,

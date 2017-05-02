@@ -36,9 +36,11 @@ mainMenuPos = 0
 players = []
 allocatedColors = {}
 endData = {}
+grass = [[0, 0] for i in range(0, platform_width, 5)]
 
 def reset():
-    global lastSpawn
+    global lastSpawn, grass
+    grass = [[0, 0] for i in range(0, platform_width, 5)]
     lastSpawn = time.time()
     del effects[:]
 
@@ -65,6 +67,7 @@ def drawGame(keys):
     resetLives = playersLeft = len(objects)
 
     lastPlayer = False
+    now = time.time()
     for obj in objects:
         if not obj.living:
             playersLeft -= 1 # remove player from living player count
@@ -76,6 +79,16 @@ def drawGame(keys):
         # set the last player to current obj, if resetLives == 1, this is the last player
 
         obj.tick(delta, getControls(obj.controller, keys))
+
+        # Update grass around this obj
+        if obj.canJump():
+            playerPos = platform_width/2 - WIDTH/2.0 + obj.x
+            center = int(round((playerPos) / 5)) * 5
+            slamDelta = now - obj.groundTime
+            slamMod = slamDelta < 0.4 and (1 - slamDelta / 0.4) * 2 or 1
+            dist = int(round(4 * slamMod) * 5)
+            for i in range(max(0, center - dist), min(platform_width, center + dist), 5):
+                grass[i/5][0] = max(min((playerPos - i) * slamMod, 70), -70)
 
         # set the player to not living if it is off screen
         if obj.y > HEIGHT + 50:
@@ -160,6 +173,20 @@ def drawGame(keys):
                 obj.color
             )
 
+
+    for i in range(0, platform_width, 5):
+        surface = pygame.Surface((3, 20), pygame.SRCALPHA, 32)
+        pygame.draw.rect(surface, GRASS_COLOR, (0, 0, 3, 10))
+        grass[i/5][1] += (grass[i/5][0] - grass[i/5][1]) * 20 * delta
+        grass[i/5][0] += (0 - grass[i/5][0]) * 10 * delta
+        surface = pygame.transform.rotate(
+          surface,
+          grass[i/5][1]
+        )
+        screen.blit(surface, (
+            WIDTH/2 - platform_width/2 + i - surface.get_width()/2.0 + 1.5,
+            HEIGHT - platform_height - surface.get_height()/2 + 2,
+        ))
 
     for obj in effects:
         obj.draw(screen)
